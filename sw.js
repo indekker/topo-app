@@ -1,5 +1,5 @@
 // Provincie-avontuur: werkt ook zonder internet
-const CACHE = "topo-app-v1";
+const CACHE = "topo-app-v2";
 const CORE = ["./", "./index.html", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png"];
 
 self.addEventListener("install", e => {

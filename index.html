@@ -205,6 +205,25 @@ h1{font-size:2rem;line-height:1.1;margin:6px 0 4px;font-weight:700}
 .big:active{transform:translateY(4px);box-shadow:0 1px 0 var(--primary-dark)}
 .big.alt{background:var(--card);color:var(--ink);box-shadow:0 5px 0 var(--btn-edge)}
 
+/* spelling */
+#play.spell .nlmap{max-height:26vh}
+.slots{display:flex;justify-content:center;gap:4px;margin:2px 0 14px;--n:8}
+.slot{width:min(42px,calc((100% - (var(--n) - 1) * 4px) / var(--n)));aspect-ratio:3/4;border-radius:10px;background:var(--card);box-shadow:inset 0 -4px 0 var(--btn-edge);display:grid;place-items:center;font-weight:700;font-size:clamp(1rem,5.2vw,1.6rem);line-height:1}
+.slot.fixed{background:transparent;box-shadow:none;width:auto;min-width:10px}
+.slot.now{box-shadow:inset 0 0 0 3px var(--primary)}
+.slot.ok{background:#DDF7E8;color:#1F2A55;box-shadow:inset 0 -4px 0 var(--good)}
+.slots.done .slot:not(.fixed){background:var(--good);color:#fff;box-shadow:inset 0 -4px 0 var(--good-dark)}
+.tiles{display:flex;flex-wrap:wrap;justify-content:center;gap:8px}
+.tile{border:0;min-width:50px;height:56px;padding:0 8px;border-radius:14px;background:var(--sun);color:#1F2A55;font-size:1.6rem;font-weight:700;box-shadow:0 5px 0 var(--sun-dark)}
+.tile:active{transform:translateY(4px);box-shadow:0 1px 0 var(--sun-dark)}
+.tile.used{visibility:hidden}
+.tile.no{background:var(--oops);color:#fff;box-shadow:0 5px 0 #C9443A}
+.tile.glow{outline:4px solid var(--good);outline-offset:2px}
+@media (prefers-reduced-motion:no-preference){ .tile.no{animation:shake .45s} .tile.glow{animation:throb 1s ease-in-out infinite} }
+.spell-actions{display:flex;justify-content:center;flex-wrap:wrap;gap:10px;margin-top:16px}
+.chip-btn{border:0;border-radius:999px;padding:10px 16px;background:var(--card);font-weight:600;font-size:1rem;box-shadow:0 3px 0 var(--btn-edge)}
+.chip-btn:active{transform:translateY(3px);box-shadow:none}
+.choice{display:grid;gap:12px}
 /* exit dialog */
 .modal{position:fixed;inset:0;background:#1F2A5599;display:none;place-items:center;z-index:80;padding:20px}
 .modal.on{display:grid}
@@ -396,7 +415,7 @@ const richtingZin = p => p.richting==="midden" ? `${p.naam} ligt in het midden v
 
 /* ---------- Storage ---------- */
 const KEY="provincie-avontuur-v1";
-function fresh(){ return {stars:0, best:{zoek:0,stad:0,thuis:0,ontdek:0}, m:Object.fromEntries(P.map(p=>[p.id,{loc:0,cap:0}])), seen:[], stickers:[], voice:true, sound:true}; }
+function fresh(){ return {stars:0, best:{zoek:0,stad:0,thuis:0,ontdek:0,schrijf:0}, m:Object.fromEntries(P.map(p=>[p.id,{loc:0,cap:0}])), seen:[], stickers:[], voice:true, sound:true}; }
 let S = fresh();
 try{ const raw=localStorage.getItem(KEY); if(raw){ const d=JSON.parse(raw); S=Object.assign(fresh(),d); S.m=Object.assign(fresh().m,d.m||{}); S.best=Object.assign(fresh().best,d.best||{}); } }catch(e){}
 function save(){ try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){} }
@@ -552,7 +571,8 @@ const MODES=[
   {id:"ontdek", t:"Ontdekken", d:"Tik op de kaart en leer alle provincies kennen.", ico:"🔍", bg:"#B8E35A"},
   {id:"zoek",  t:"Zoek de provincie", d:"Waar ligt Zeeland? Tik hem aan op de kaart.", ico:"📍", bg:"#FFC145"},
   {id:"stad",  t:"Welke hoofdstad?", d:"Kies de goede stad bij de provincie.", ico:"🏙️", bg:"#8C9EFF"},
-  {id:"thuis", t:"Breng de stad thuis", d:"In welke provincie hoort deze stad?", ico:"🏠", bg:"#FF8FC7"}
+  {id:"thuis", t:"Breng de stad thuis", d:"In welke provincie hoort deze stad?", ico:"🏠", bg:"#FF8FC7"},
+  {id:"schrijf", t:"Schrijf het goed", d:"Leer de namen schrijven met letterblokjes.", ico:"✏️", bg:"#3FCFB4"}
 ];
 function starsHtml(n){return [0,1,2].map(i=>`<span class="${i<n?"star-on":"star-off"}">★</span>`).join("");}
 function goHome(){
@@ -564,7 +584,7 @@ function goHome(){
     li.innerHTML=`<button class="stop" data-mode="${m.id}"><span class="num" style="background:${m.bg}" aria-hidden="true">${m.ico}</span><span class="txt"><span class="t">${i+1}. ${m.t}</span><span class="d">${m.d}</span></span><span class="stars" aria-label="${best} van 3 sterren">${starsHtml(best)}</span></button>`;
     r.appendChild(li);
   });
-  r.querySelectorAll(".stop").forEach(b=>b.onclick=()=>{sndTap(); b.dataset.mode==="ontdek"?startExplore():startQuiz(b.dataset.mode);});
+  r.querySelectorAll(".stop").forEach(b=>b.onclick=()=>{sndTap(); const md=b.dataset.mode; md==="ontdek"?startExplore():md==="schrijf"?startSpell():startQuiz(md);});
   $("#albumCount").textContent=`${S.stickers.length}/12`;
   const hm=$("#homeMap"); const old=hm.querySelector(".nlmap"); if(old) old.remove();
   const c=map.cloneNode(true); c.setAttribute("class","nlmap mini"); c.removeAttribute("role"); c.removeAttribute("aria-label"); c.setAttribute("aria-hidden","true");
@@ -580,13 +600,13 @@ function goHome(){
   const total=S.stickers.length;
   $("#homeBubble").textContent = total===12 ? "Wauw, je hebt alle 12 stickers! Jij bent een echte Nederland-kenner." :
     S.seen.length<12 ? "Hoi! Ik ben Bo de ballon. Samen kleuren we de kaart van Nederland in. Begin bij stap 1!" :
-    "Goed bezig! Elke sticker kleurt een provincie in. Speel stap 2, 3 en 4.";
+    "Goed bezig! Elke sticker kleurt een provincie in. Speel stap 2, 3 en 4, en oefen het schrijven bij stap 5.";
   show("home");
 }
 
 /* ---------- Explore ---------- */
 function startExplore(){
-  $("#play").classList.remove("has-opts"); mapReset(); map.classList.add("show-caps","show-names");
+  $("#play").classList.remove("has-opts","spell"); mapReset(); map.classList.add("show-caps","show-names");
   $("#dots").innerHTML=""; $("#hint").className="hint";
   setQ("Tik op een provincie om haar te leren kennen.");
   say("Tik op een provincie om haar te leren kennen.");
@@ -617,20 +637,21 @@ function setQ(html){ $("#question").innerHTML=html; }
 const PRAISE=["Goed zo!","Super!","Knap gedaan!","Helemaal goed!","Jij bent slim!","Yes, raak!","Top!"];
 const ROUND=8;
 let Q=null;
-const skillOf = mode => mode==="zoek" ? "loc" : "cap";
+const skillOf = mode => mode==="zoek" ? "loc" : mode==="schrijf" ? (Q&&Q.kind==="stad"?"spelC":"spelP") : "cap";
 
-function weightedRound(mode){
+function weightedRound(mode,n){
   const sk=skillOf(mode), w=[6,4,2,1];
-  let pool=P.map(p=>({p,w:w[Math.min(3,S.m[p.id][sk])]})), out=[];
-  while(out.length<ROUND && pool.length){
+  let pool=P.map(p=>({p,w:w[Math.min(3,S.m[p.id][sk]||0)]})), out=[];
+  while(out.length<n && pool.length){
     const tot=pool.reduce((a,b)=>a+b.w,0); let r=Math.random()*tot, i=0;
     while((r-=pool[i].w)>0 && i<pool.length-1) i++;
     out.push(pool[i].p); pool.splice(i,1);
   }
   return out;
 }
-function startQuiz(mode){
-  Q={mode, list:weightedRound(mode), i:0, first:0, asked:0, tries:0, redo:0, locked:false, marks:[]};
+function startQuiz(mode,kind){
+  Q={mode, kind, i:0, first:0, asked:0, tries:0, redo:0, locked:false, marks:[]};
+  Q.list=weightedRound(mode, mode==="schrijf"?6:ROUND);
   show("play"); nextQ();
 }
 function renderDots(){
@@ -642,12 +663,14 @@ function nextQ(){
   if(Q.i>=Q.list.length) return endQuiz();
   Q.tries=0; Q.locked=false; Q.p=Q.list[Q.i]; Q.asked++;
   $("#hint").className="hint"; $("#below").innerHTML="";
-  mapReset(); renderDots(); $("#play").classList.toggle("has-opts",Q.mode==="stad");
+  mapReset(); renderDots(); $("#play").classList.toggle("has-opts",Q.mode==="stad"); $("#play").classList.toggle("spell",Q.mode==="schrijf");
   const p=Q.p;
   if(Q.mode==="zoek"){
     setQ(`Waar ligt <b>${p.naam}</b>? Tik erop!`);
     say(`Waar ligt ${p.naam}? Tik erop!`);
     onProv=id=>answerMap(id);
+  } else if(Q.mode==="schrijf"){
+    onProv=null; spellLook();
   } else if(Q.mode==="thuis"){
     map.classList.add("show-caps","one-cap");
     setQ(`In welke provincie ligt<br><span class="city-tag">🏙️ ${cityShort(p)}</span>`);
@@ -666,7 +689,7 @@ function nextQ(){
     $("#below").appendChild(box);
   }
 }
-function level(delta){ const m=S.m[Q.p.id], sk=skillOf(Q.mode); m[sk]=Math.max(0,Math.min(3,m[sk]+delta)); save(); }
+function level(delta){ const m=S.m[Q.p.id], sk=skillOf(Q.mode); m[sk]=Math.max(0,Math.min(3,(m[sk]||0)+delta)); save(); }
 function good(){
   Q.locked=true;
   if(Q.tries===0){ Q.first++; level(+1); addStars(1); starPop(); Q.marks[Q.i]="ok"; }
@@ -741,10 +764,107 @@ function endQuiz(){
   else if(msLeft && Q.mode==="zoek" && S.best.stad===0) txt += " Tip: speel ook ‘Welke hoofdstad?’ om stickers te verdienen.";
   $("#endText").textContent=txt;
   $("#endStickers").innerHTML=fresh.map(p=>`<div class="disc" style="background:${p.kleur}" title="${p.naam}">${p.emoji}</div>`).join("");
-  $("#againBtn").onclick=()=>startQuiz(Q.mode);
+  const again=Q.mode, againKind=Q.kind; $("#againBtn").onclick=()=>startQuiz(again,againKind);
   show("end"); sndWin(); confetti(stars*30);
   say(`${$("#endTitle").textContent} ${txt}`);
   Q.fresh=fresh.map(p=>p.id);
+}
+
+/* ---------- Schrijven (kijk - verstop - schrijf - check) ---------- */
+const FIXED=/^[-' ]$/;
+function units(w){ const u=[]; for(let i=0;i<w.length;i++){ const two=w.substr(i,2); if(/^ij$/i.test(two)){u.push(two);i++;} else u.push(w[i]); } return u; }
+function startSpell(){
+  Q=null; onProv=null; mapReset();
+  $("#play").classList.remove("has-opts"); $("#play").classList.add("spell");
+  $("#dots").innerHTML=""; $("#hint").className="hint";
+  setQ("Wat wil je leren schrijven?");
+  say("Wat wil je leren schrijven? De provincies of de hoofdsteden?");
+  $("#below").innerHTML=`<div class="choice"><button class="big" data-k="prov">🗺️ De provincies</button><button class="big alt" data-k="stad">🏙️ De hoofdsteden</button></div>`;
+  $("#below").querySelectorAll("button").forEach(b=>b.onclick=()=>{sndTap(); startQuiz("schrijf",b.dataset.k);});
+  show("play");
+}
+function spellWord(p){ return Q.kind==="stad" ? cityShort(p) : p.naam; }
+function drawSlots(full){
+  const s=$("#slots"); s.style.setProperty("--n",Q.u.length); s.innerHTML="";
+  Q.u.forEach((ch,i)=>{
+    const d=document.createElement("div"), fixed=FIXED.test(ch);
+    d.className="slot"+(fixed?" fixed":"");
+    if(full||fixed||i<Q.pos) d.textContent=ch;
+    if(!full&&!fixed&&i<Q.pos) d.classList.add("ok");
+    if(!full&&i===Q.pos) d.classList.add("now");
+    s.appendChild(d);
+  });
+  s.setAttribute("aria-label", full ? Q.word : `${Q.pos} letters geschreven`);
+}
+function skipFixed(){ while(Q.pos<Q.u.length && FIXED.test(Q.u[Q.pos])) Q.pos++; }
+function spellLook(){
+  const p=Q.p; Q.word=spellWord(p); Q.u=units(Q.word); Q.pos=0; Q.err=0; Q.slotErr=0; Q.peeked=false;
+  map.classList.add("dim-others"); provClass(p.id,"hi");
+  if(Q.kind==="stad"){ map.classList.add("show-caps","one-cap"); map.querySelector(`.cap[data-id="${p.id}"]`).classList.add("solo"); }
+  if(Q.kind==="stad"){ setQ(`Dit is de hoofdstad van <b>${p.naam}</b>. Kijk goed!`); say(`De hoofdstad van ${p.naam} is ${Q.word}. Kijk goed hoe je dat schrijft.`); }
+  else { setQ(`Kijk goed hoe je deze provincie schrijft.`); say(`Deze provincie heet ${Q.word}. Kijk goed hoe je dat schrijft.`); }
+  $("#below").innerHTML=`<div class="slots" id="slots" role="img"></div><div class="btnrow"><button class="big" id="hideBtn">🙈 Verstop het woord en schrijf!</button></div>`;
+  drawSlots(true);
+  $("#hideBtn").onclick=()=>{ sndTap(); spellWrite(); };
+}
+function spellWrite(){
+  const p=Q.p, lvl=S.m[p.id][skillOf("schrijf")]||0;
+  if(Q.kind==="stad"){ setQ(`Schrijf de hoofdstad van <b>${p.naam}</b>.`); say(`Schrijf de hoofdstad van ${p.naam}.`); }
+  else { setQ(`Schrijf de naam van deze provincie.`); say(`Schrijf de naam van deze provincie.`); }
+  skipFixed();
+  const letters=Q.u.filter(c=>!FIXED.test(c)), extra=[];
+  if(lvl>=1){
+    if(Q.u.some(c=>/^ij$/i.test(c))) extra.push("y");
+    const want=lvl>=2?3:2, alph="aeiouklmnrstdg".split("");
+    while(extra.length<want) extra.push(pick(alph));
+  }
+  const tiles=shuffle(letters.concat(extra));
+  $("#below").innerHTML=`<div class="slots" id="slots"></div><div class="tiles" id="tiles"></div>
+    <div class="spell-actions"><button class="chip-btn" id="peekBtn">👀 Even spieken</button><button class="chip-btn" id="wordBtn">🔊 Hoor het woord</button></div>`;
+  const box=$("#tiles");
+  tiles.forEach(ch=>{ const b=document.createElement("button"); b.className="tile"; b.textContent=ch; b.dataset.ch=ch; b.setAttribute("aria-label",`letter ${ch}`); b.onclick=()=>tapTile(b); box.appendChild(b); });
+  drawSlots(false);
+  $("#peekBtn").onclick=()=>{ if(Q.locked)return; Q.peeked=true; sndTap(); drawSlots(true); setTimeout(()=>{ if(!Q.locked) drawSlots(false); },1600); };
+  $("#wordBtn").onclick=()=>say(Q.word,true);
+}
+function tapTile(btn){
+  if(Q.locked || btn.disabled) return;
+  const want=Q.u[Q.pos];
+  if(btn.dataset.ch===want){
+    btn.classList.add("used"); btn.disabled=true; sndTap();
+    Q.pos++; Q.slotErr=0; skipFixed();
+    document.querySelectorAll(".tile.glow").forEach(t=>t.classList.remove("glow"));
+    $("#hint").className="hint";
+    drawSlots(false);
+    if(Q.pos>=Q.u.length) spellDone();
+  } else {
+    Q.err++; Q.slotErr++; sndOops();
+    btn.classList.remove("no"); void btn.offsetWidth; btn.classList.add("no");
+    setTimeout(()=>btn.classList.remove("no"),500);
+    if(Q.slotErr===1 && Q.pos===0 && want!==want.toLowerCase()){ hint("💡 Een naam begint altijd met een hoofdletter."); say("Een naam begint altijd met een hoofdletter."); }
+    else if(Q.slotErr===1 && /^ij$/i.test(want)){ hint("💡 Hier komt de lange ij. Die staat samen op één blokje."); say("Hier komt de lange ij."); }
+    else if(Q.slotErr>=2){
+      const t=[...document.querySelectorAll(".tile")].find(x=>!x.disabled && x.dataset.ch===want);
+      if(t) t.classList.add("glow");
+      hint(`Zoek het blokje met de <b>${want}</b>. Het licht op!`);
+    }
+  }
+}
+function spellDone(){
+  Q.locked=true; $("#slots").classList.add("done");
+  const t=$("#tiles"); if(t) t.style.display="none";
+  const acts=document.querySelector(".spell-actions"); if(acts) acts.style.display="none";
+  const clean = Q.err===0 && !Q.peeked;
+  if(clean){ Q.first++; level(+1); addStars(1); starPop(); Q.marks[Q.i]="ok"; }
+  else {
+    Q.marks[Q.i]="half";
+    if(Q.err>=3){ level(-1); if(Q.redo<3 && !Q.list.slice(Q.i+1).includes(Q.p)){ Q.list.push(Q.p); Q.redo++; } }
+    else if(Q.err<=1) addStars(1);
+  }
+  save(); renderDots(); sndGood(); confetti(clean?28:12);
+  const line = clean ? `${pick(PRAISE)} Je schreef ${Q.word} in één keer goed.` : `Goed zo! Zo schrijf je ${Q.word}.`;
+  hint(`<b>${line}</b>`,true); say(line);
+  setTimeout(()=>{ Q.i++; nextQ(); },2200);
 }
 
 /* ---------- Album ---------- */
